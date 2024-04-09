@@ -11,8 +11,12 @@ import pyarrow as pa
 import pyarrow.parquet as pp
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
-    
+
+n = 0
 def calculate_factors(row, df_ticket):
+    global n
+    print(n)
+    n = n + 1
     # 将日期转换为与df_B中的date格式相同的格式
     formatted_date     = int(row['日期'].replace('年', '').replace('月', '').replace('日', ''))
     # 筛选df_B中与当前行日期和股票代码匹配的行
