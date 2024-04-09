@@ -82,20 +82,10 @@ if __name__ == '__main__':
     mean_value = df[column_name].mean()
     variance_value = df[column_name].var()
     print(f"平均值: {mean_value}, 方差: {variance_value}")
-     
-    # 获取ticket数据
-    ticket_path = './parquet_ticket'
-    df_ticket = get_ticket_and_check(df_raw=df, ticket_path=ticket_path)
-    # 生成ticket信号并反标回原始行情
-    factors_df = df_ticket.groupby(['date', 'stock_id']).apply(calculate_factors).reset_index()
-    #print(factors_df.head(10))
     
-    
-    # 获取当前时间
+    # 保存清洗后数据
     now = datetime.now()
-    # 转换为字符串格式
     time_str = now.strftime("%Y%m%d_%H%M%S")
-    # 多格式数据保存
     try:
         df.to_csv('data_clean_'+time_str+'.csv', encoding='GBK', index=False)
     except:
@@ -106,4 +96,24 @@ if __name__ == '__main__':
         pass
     pp.write_table(pa.Table.from_pandas(df), 'data_clean.parquet')
     pp.write_table(pa.Table.from_pandas(df), './parquet_data_clean/data_clean_'+time_str+'.parquet')
+     
+    # 获取ticket数据
+    ticket_path = './parquet_ticket'
+    df_ticket = get_ticket_and_check(df_raw=df, ticket_path=ticket_path)
+    # 生成ticket信号并反标回原始行情
+    df[['开盘6秒增益', '开盘6秒方向']] = df.apply(lambda row: calculate_factors(row, df_ticket), axis=1)
+    
+    # 保存完整数据集
+    now = datetime.now()
+    time_str = now.strftime("%Y%m%d_%H%M%S")
+    try:
+        df.to_csv('data_with_ticket_'+time_str+'.csv', encoding='GBK', index=False)
+    except:
+        pass
+    try:
+        df.to_csv('data_with_ticket'+time_str,sep='\t')
+    except:
+        pass
+    pp.write_table(pa.Table.from_pandas(df), 'data_with_ticket.parquet')
+    pp.write_table(pa.Table.from_pandas(df), './parquet_data_with_ticket/data_with_ticket_'+time_str+'.parquet')
  

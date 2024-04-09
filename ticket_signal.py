@@ -11,25 +11,27 @@ import pyarrow as pa
 import pyarrow.parquet as pp
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+    
+def calculate_factors(row, df_ticket):
+    # 将日期转换为与df_B中的date格式相同的格式
+    formatted_date     = int(row['日期'].replace('年', '').replace('月', '').replace('日', ''))
+    # 筛选df_B中与当前行日期和股票代码匹配的行
+    mask = (df_ticket['date'] == formatted_date) & (df_ticket['stock_id'] == row['股票代码'][:-3])
+    df = df_ticket[mask]
+    df= df.reset_index()
 
-n = 0
-def calculate_factors(df):
-    global n
-    n = n + 1
-    print(n)
-    df = df.reset_index()
     if len(df) < 3:
-        df['factor_a'] = 0
-        df['factor_b'] = 0
-        return df
-    # 计算因子a
-    if df.loc[0, 'vol'] == 0:
-        df['factor_a'] = 1
+        factor_a = 0
+        factor_b = 0
     else:
-        df['factor_a'] = (df.loc[1, 'vol'] + df.loc[2, 'vol']) / df.loc[0, 'vol']
-    # 计算因子b
-    df['factor_b'] = (df.loc[1, 'vol'] * (1 if df.loc[1, 'buyorsell'] == 0 else -1)) + (df.loc[2, 'vol'] * (1 if df.loc[2, 'buyorsell'] == 0 else -1))
-    return df
+        # 计算因子a
+        if df.loc[0, 'vol'] == 0:
+            factor_a = 1
+        else:
+            factor_a = (df.loc[1, 'vol'] + df.loc[2, 'vol']) / df.loc[0, 'vol']
+        # 计算因子b
+        factor_b = ((df.loc[1, 'vol'] * (1 if df.loc[1, 'buyorsell'] == 0 else -1)) + (df.loc[2, 'vol'] * (1 if df.loc[2, 'buyorsell'] == 0 else -1))) / (df.loc[1, 'vol'] + df.loc[2, 'vol'])
+    return pd.Series([factor_a, factor_b], index=['factor_a', 'factor_b'])
 
 def data_to_df(data):
     # 提取列表和日期
@@ -158,11 +160,7 @@ if __name__ == '__main__':
     ticket_path = './parquet_ticket'
     df_ticket = get_ticket_and_check(df_raw=df_raw, ticket_path=ticket_path)
     
-    # 生成ticket信号并反标回原始行情
-    # 使用groupby方法按照'date'和'stock_id'进行分组，并应用calculate_factors函数
-    factors_df = df_ticket.groupby(['date', 'stock_id']).apply(calculate_factors).reset_index()
-    print(factors_df.head(10))
-    sys.exit()
+    df_raw = df_raw.head(10)
     
     # 多格式数据保存
     now = datetime.now()
