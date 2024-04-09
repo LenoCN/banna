@@ -13,6 +13,29 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 n = 0
+# 优化后的 calculate_factors 函数
+def calculate_factors_optimized(row, df_ticket):
+    global n
+    print(n)
+    n = n + 1
+    # 使用传入的行信息筛选 df_ticket
+    mask = (df_ticket['date'] == row['formatted_date']) & (df_ticket['stock_id'] == row['stock_id'])
+    df = df_ticket[mask]
+
+    if len(df) < 3:
+        return pd.Series([0, 0], index=['开盘6秒增益', '开盘6秒方向'])
+
+    vol0 = df.iloc[0]['vol']
+    vol1 = df.iloc[1]['vol']
+    vol2 = df.iloc[2]['vol']
+    buyorsell1 = df.iloc[1]['buyorsell']
+    buyorsell2 = df.iloc[2]['buyorsell']
+
+    factor_a = 1 if vol0 == 0 else (vol1 + vol2) / vol0
+    factor_b = ((vol1 * (1 if buyorsell1 == 0 else -1)) + (vol2 * (1 if buyorsell2 == 0 else -1))) / (vol1 + vol2)
+
+    return pd.Series([factor_a, factor_b], index=['开盘6秒增益', '开盘6秒方向'])
+
 def calculate_factors(row, df_ticket):
     global n
     print(n)

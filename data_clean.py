@@ -1,10 +1,11 @@
 import sys
 from datetime import datetime, timedelta
 import pandas as pd
+import swifter
 import pyarrow.parquet as pp
 import pyarrow as pa
 import glob
-from ticket_signal import get_ticket_and_check, calculate_factors
+from ticket_signal import get_ticket_and_check, calculate_factors, calculate_factors_optimized
 from find_leading import format_if_decimal
 from get_usdcnh import get_usdcnh_macd
 import numpy as np
@@ -101,7 +102,12 @@ if __name__ == '__main__':
     ticket_path = './parquet_ticket'
     df_ticket = get_ticket_and_check(df_raw=df, ticket_path=ticket_path)
     # 生成ticket信号并反标回原始行情
-    df[['开盘6秒增益', '开盘6秒方向']] = df.apply(lambda row: calculate_factors(row, df_ticket), axis=1)
+    df['formatted_date'] = df['日期'].str.replace('年', '').str.replace('月', '').str.replace('日', '').astype(int)
+    df['stock_id'] = df['股票代码'].str.slice(0, -3)
+    # 使用 swifter 库并行应用函数
+    print('ENtry')
+    df[['开盘6秒增益', '开盘6秒方向']] = df.swifter.apply(lambda row: calculate_factors_optimized(row, df_ticket), axis=1)
+    #df[['开盘6秒增益', '开盘6秒方向']] = df.apply(lambda row: calculate_factors(row, df_ticket), axis=1)
     
     # 保存完整数据集
     now = datetime.now()
