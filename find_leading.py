@@ -12,7 +12,6 @@ import time
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 
-#cookie = 'PHPSESSID=c0bd5999ef3f9b01ef50feb05bef8c2f; cid=56c69e7f80c5f63783213274fdcc5b0d1672839513; ComputerID=56c69e7f80c5f63783213274fdcc5b0d1672839513; WafStatus=0; wencai_pc_version=1; ta_random_userid=i3nuahvoik; other_uid=Ths_iwencai_Xuangu_capmda2bumoytyx77kawlhhz0scee3mh; THSSESSID=6f13bb6a0c50de810f4a71ba4f; u_ukey=A10702B8689642C6BE607730E11E6E4A; u_uver=1.0.0; u_dpass=A2gMe4KE4gKxbT%2FzqtQY5cxwL3EX7wRCv%2FVLhpeZo0O4hNL0x9Tas8y9%2FKT3cE3e%2FsBAGfA5tlbuzYBqqcUNFA%3D%3D; u_did=C15C4C7A4B464560AA5C2ECCECC1B3DD; u_ttype=WEB; user=MDpteF81MTAzMjU4MTU6Ok5vbmU6NTAwOjUyMDMyNTgxNTo3LDExMTExMTExMTExLDQwOzQ0LDExLDQwOzYsMSw0MDs1LDEsNDA7MSwxMDEsNDA7MiwxLDQwOzMsMSw0MDs1LDEsNDA7OCwwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSw0MDsxMDIsMSw0MDoxNjo6OjUxMDMyNTgxNToxNzExMzc5MTczOjo6MTU4MTg0MjY0MDo2MDQ4MDA6MDoxY2Q2Mzc4YjM3MDFlZDEyYTAxODg2MjhkZjhjNmE3Njk6ZGVmYXVsdF80OjA%3D; userid=510325815; u_name=mx_510325815; escapename=mx_510325815; ticket=3d4f2bd355bff1dca0a7ef1a816a3304; user_status=0; utk=db8d0c980a42fe1a3d099d2ba742c281; v=A77OzvzYVGGhC4BFf04EjaBtD98F_4KzFMM2XWjDKoH8C1BB0I_SieRThks7'
 cookie = 'PHPSESSID=c0bd5999ef3f9b01ef50feb05bef8c2f; cid=56c69e7f80c5f63783213274fdcc5b0d1672839513; ComputerID=56c69e7f80c5f63783213274fdcc5b0d1672839513; WafStatus=0; wencai_pc_version=1; ta_random_userid=i3nuahvoik; other_uid=Ths_iwencai_Xuangu_capmda2bumoytyx77kawlhhz0scee3mh; THSSESSID=6f13bb6a0c50de810f4a71ba4f; u_ukey=A10702B8689642C6BE607730E11E6E4A; u_uver=1.0.0; u_dpass=A2gMe4KE4gKxbT%2FzqtQY5cxwL3EX7wRCv%2FVLhpeZo0O4hNL0x9Tas8y9%2FKT3cE3e%2FsBAGfA5tlbuzYBqqcUNFA%3D%3D; u_did=C15C4C7A4B464560AA5C2ECCECC1B3DD; u_ttype=WEB; ttype=WEB; user=MDpteF81MTAzMjU4MTU6Ok5vbmU6NTAwOjUyMDMyNTgxNTo3LDExMTExMTExMTExLDQwOzQ0LDExLDQwOzYsMSw0MDs1LDEsNDA7MSwxMDEsNDA7MiwxLDQwOzMsMSw0MDs1LDEsNDA7OCwwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSw0MDsxMDIsMSw0MDoxNjo6OjUxMDMyNTgxNToxNzExOTg0OTI5Ojo6MTU4MTg0MjY0MDo1NzQ2NzE6MDoxYjhiMTM1ZTNmMjNmOTdjYzE5YWFjZDA4ZWY1OTAxMzY6ZGVmYXVsdF80OjA%3D; userid=510325815; u_name=mx_510325815; escapename=mx_510325815; ticket=1ddca5afc4cfbcb18a5c12afce368743; user_status=0; utk=561c15a6c3a54d4fafac817ea09d6a15; v=A04-HoyIpLOZgxCXeTW0PbBdny8VzxIZJJPGrXiWutEM2-CR4F9i2fQjFp1L'
 # 自定义函数，用于格式化数字，保留两位小数
 def format_if_decimal(value):
@@ -45,7 +44,7 @@ def get_res(query):
 
 
 def find_leading(start_date, end_date, sleep_time):
-    # 计算开盘日 ： TODO
+    # 计算开盘日
     workdays = workdays_list(start_date, end_date)
     print(workdays)
     if len(workdays) < 3:

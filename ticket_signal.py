@@ -12,6 +12,25 @@ import pyarrow.parquet as pp
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
+n = 0
+def calculate_factors(df):
+    global n
+    n = n + 1
+    print(n)
+    df = df.reset_index()
+    if len(df) < 3:
+        df['factor_a'] = 0
+        df['factor_b'] = 0
+        return df
+    # 计算因子a
+    if df.loc[0, 'vol'] == 0:
+        df['factor_a'] = 1
+    else:
+        df['factor_a'] = (df.loc[1, 'vol'] + df.loc[2, 'vol']) / df.loc[0, 'vol']
+    # 计算因子b
+    df['factor_b'] = (df.loc[1, 'vol'] * (1 if df.loc[1, 'buyorsell'] == 0 else -1)) + (df.loc[2, 'vol'] * (1 if df.loc[2, 'buyorsell'] == 0 else -1))
+    return df
+
 def data_to_df(data):
     # 提取列表和日期
     list_of_ordered_dicts, date = data
@@ -31,7 +50,7 @@ def get_and_process_data(stock_id, date):
     df['stock_id'] = stock_id
     return df
 
-def save_to_parquet(dataframes, counter):
+def save_to_parquet(dataframes, counter, ticket_path):
     # 合并DataFrame
     chunk_df = pd.concat(dataframes, ignore_index=True)
     
@@ -39,33 +58,24 @@ def save_to_parquet(dataframes, counter):
     now = datetime.now()
     time_str = now.strftime("%Y%m%d_%H%M%S")
     chunk_df.to_csv(f'./parquet_ticket/ticket_chunk_{counter}_{time_str}', index=False)
-    pp.write_table(pa.Table.from_pandas(chunk_df), f'./parquet_ticket/ticket_chunk_{counter}_{time_str}.parquet')
+    pp.write_table(pa.Table.from_pandas(chunk_df), f'{ticket_path}/ticket_chunk_{counter}_{time_str}.parquet')
 
-def get_ticket(df):
+def get_ticket(df, ticket_path):
     # 提取股票代码中的数字和日期，然后将每对值作为一个列表存入一个大列表中
     combined_list = [[code[:-3], int(date.replace('年', '').replace('月', '').replace('日', ''))] for code, date in zip(df['股票代码'], df['日期'])]
     combined_list = [item for item in combined_list if str(item[0]).startswith(('00', '30', '60', '68'))]
     # 过滤掉日期是法定节假日的子列表
     combined_list = [
         stock for stock in combined_list 
-        if not is_holiday(datetime.strptime(str(stock[1]), "%Y%m%d"))
-    ]
+        if not is_holiday(datetime.strptime(str(stock[1]), "%Y%m%d")) ]
     print(len(combined_list))
-
-    b = time.time()
-    print(b-a)
-
-    # 假设combined_list是已经定义好的列表
-    # 假设get_and_process_data是已经定义好的函数
 
     chunk_size = 5000  # 设置每个分段的大小
     chunk_counter = 0  # 初始化分段计数器
 
     combined_list = combined_list[chunk_counter*5000:]
-
     # 初始化一个空列表用于存储结果
     all_data_list = []
-
     # 使用ThreadPoolExecutor来并发执行get_and_process_data函数
     with ThreadPoolExecutor(max_workers=50) as executor:
         # 提交任务到线程池并立即返回Future对象列表
@@ -78,22 +88,16 @@ def get_ticket(df):
             if result is not None:
                 # 将结果追加到all_data_list中
                 all_data_list.append(result)
-
             # 检查是否收集了足够的结果进行保存
             if len(all_data_list) >= chunk_size:
-                save_to_parquet(all_data_list, chunk_counter)
+                save_to_parquet(all_data_list, chunk_counter, ticket_path)
                 all_data_list = []  # 重置列表以便收集新的结果
                 chunk_counter += 1  # 更新分段计数器
-
             print(i, len(combined_list))
             i = i + 1
-
     # 处理剩余的结果（如果有的话）
     if all_data_list:
-        save_to_parquet(all_data_list, chunk_counter)
-
-    b = time.time()
-    print(b-a)
+        save_to_parquet(all_data_list, chunk_counter, ticket_path)
 
 def ticket_merge(df_raw, df_ticket):
     # 先转换df_raw的股票代码和日期到stock_id和date
@@ -115,25 +119,10 @@ def find_unmarked_rows(df_raw, df_ticket):
     unmarked_stock_dates = unmarked_rows[['股票代码', '日期']]
     return unmarked_stock_dates
 
-
-if __name__ == '__main__':
-    a = time.time()
-    # 读取原始行情数据
-    file_list = glob.glob('./data_20_24/*.parquet')
-    df_raw = pd.concat((pd.read_parquet(file) for file in file_list), ignore_index=True)
-    # 去除重复项
-    df_raw = df_raw.drop_duplicates()
-    
-    b = time.time()
-    print(b-a)
-    
-    # 第一步 首次获取ticket
-    #get_ticket(df_raw)
-    
-    # 第二步 
-    # 读取ticket行情数据
+def get_ticket_and_check(df_raw, ticket_path):
+    # 第二步 读取ticket行情数据, 并检查是否有遗漏，如果有重新获取
     while True:
-        file_list = glob.glob('./parquet_ticket/ticket_chunk*.parquet')
+        file_list = glob.glob(f'{ticket_path}/ticket_chunk*.parquet')
         df_ticket = pd.concat((pd.read_parquet(file) for file in file_list), ignore_index=True)
         df_ticket = df_ticket.drop_duplicates()
         # 找出没有被成功标注的行
@@ -145,15 +134,39 @@ if __name__ == '__main__':
             stock for stock in combined_list 
             if not is_holiday(datetime.strptime(str(stock[1]), "%Y%m%d"))
         ]
-        # 再次获取ticket
+        # 获取ticket
         if len(combined_list) != 0:
-            get_ticket(unmarked_stock_dates)
+            print('Warning : 存在未获取的ticket行情')
+            get_ticket(unmarked_stock_dates, ticket_path)
+        # 直到全部原始行情数据的每一行都被成功标注
         else:
+            print('Info : 以获取所有原始行情对应的ticket数据')
             break
+    return df_ticket
+
+
+if __name__ == '__main__':
+    a = time.time()
     
-    # 第三步 多格式数据保存
+    # 第一步 读取清洗后行情数据
+    df_raw = pd.read_parquet('./data_clean.parquet')
+    df_raw = df_raw.drop_duplicates()
+    
+    b = time.time()
+    print(b-a)
+    # 第二步 获取所有ticket数据
+    ticket_path = './parquet_ticket'
+    df_ticket = get_ticket_and_check(df_raw=df_raw, ticket_path=ticket_path)
+    
+    # 生成ticket信号并反标回原始行情
+    # 使用groupby方法按照'date'和'stock_id'进行分组，并应用calculate_factors函数
+    factors_df = df_ticket.groupby(['date', 'stock_id']).apply(calculate_factors).reset_index()
+    print(factors_df.head(10))
+    sys.exit()
+    
+    # 多格式数据保存
     now = datetime.now()
     time_str = now.strftime("%Y%m%d_%H%M%S")
-    pp.write_table(pa.Table.from_pandas(df_ticket), f'./parquet_ticket/ticket_all_{time_str}.parquet')
-    df_ticket.to_csv('ticket',sep='\t')
-    
+    pp.write_table(pa.Table.from_pandas(df_ticket), f'{ticket_path}/ticket_all_{time_str}.parquet')
+    b = time.time()
+    print(b-a)

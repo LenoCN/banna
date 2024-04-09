@@ -1,9 +1,10 @@
-import pywencai
+import sys
 from datetime import datetime, timedelta
 import pandas as pd
 import pyarrow.parquet as pp
 import pyarrow as pa
 import glob
+from ticket_signal import get_ticket_and_check, calculate_factors
 from find_leading import format_if_decimal
 from get_usdcnh import get_usdcnh_macd
 import numpy as np
@@ -13,17 +14,11 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 
 
-def calculate_factors(df):
-    # 计算因子a
-    df['factor_a'] = (df.loc[1, 'vol'] + df.loc[2, 'vol']) / df.loc[0, 'vol']
-    # 计算因子b
-    df['factor_b'] = (df.loc[1, 'vol'] * (1 if df.loc[1, 'buyorsell'] == 0 else -1)) + (df.loc[2, 'vol'] * (1 if df.loc[2, 'buyorsell'] == 0 else -1))
-    return df
-
 def rename_columns(df):
     rename_mapping = {
         '日期': '日期',
         '股票简称': '股票简称',
+        '股票代码': '股票代码',
         '总市值': '总市值',
         'a股市值(不含限售股)': '流通值',
         '个股热度排名': '昨日热度排名',
@@ -62,7 +57,7 @@ if __name__ == '__main__':
     # 重命名加强可读性
     df = rename_columns(df=df)
     # 将除了某些列之外的所有列转换为数值类型
-    columns_to_convert = df.columns.difference(['日期', '股票简称', '曾涨停', '首次涨停时间'])
+    columns_to_convert = df.columns.difference(['日期', '股票简称', '股票代码', '曾涨停', '首次涨停时间'])
     df[columns_to_convert] = df[columns_to_convert].apply(pd.to_numeric, errors='coerce')
     # 插入'竞价换手增幅' '31分换手增幅' '日内增幅' 列
     df['竞价换手增幅'] = df.apply(lambda row: 1 if row['昨日竞价换手率'] == 0 else row['今日竞价换手率'] / row['昨日竞价换手率'], axis=1)
@@ -76,7 +71,7 @@ if __name__ == '__main__':
     # 添加汇率趋势
     df_usdcnh = get_usdcnh_macd()
     df = df.merge(df_usdcnh[['日期', 'MACD.MACD']], on='日期', how='left')
-
+ 
     # 移除包含NaN的行
     df.replace('nan', np.nan, inplace=True)
     df.dropna(inplace=True)
@@ -87,6 +82,14 @@ if __name__ == '__main__':
     mean_value = df[column_name].mean()
     variance_value = df[column_name].var()
     print(f"平均值: {mean_value}, 方差: {variance_value}")
+     
+    # 获取ticket数据
+    ticket_path = './parquet_ticket'
+    df_ticket = get_ticket_and_check(df_raw=df, ticket_path=ticket_path)
+    # 生成ticket信号并反标回原始行情
+    factors_df = df_ticket.groupby(['date', 'stock_id']).apply(calculate_factors).reset_index()
+    #print(factors_df.head(10))
+    
     
     # 获取当前时间
     now = datetime.now()
