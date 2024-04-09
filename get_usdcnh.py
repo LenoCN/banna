@@ -1,7 +1,7 @@
 import pandas as pd
 
 def get_usdcnh_macd():
-    file_path = r'c:\new_tdx\T0002\export\USDCNH.txt'
+    file_path = r'./USDCNH.txt'
     encoding = 'gbk'
     # Read the text file using the specified separator and encoding
     df = pd.read_csv(file_path, sep=r'\s+', encoding=encoding, skiprows=2)
