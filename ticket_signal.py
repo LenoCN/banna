@@ -6,59 +6,44 @@ import pyarrow.parquet as pp
 import pyarrow as pa
 import glob
 from datetime import datetime
-import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pp
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+import numpy as np
+from multiprocessing import Pool, cpu_count
 
-n = 0
-# 优化后的 calculate_factors 函数
-def calculate_factors_optimized(row, df_ticket):
-    global n
-    print(n)
-    n = n + 1
-    # 使用传入的行信息筛选 df_ticket
-    mask = (df_ticket['date'] == row['formatted_date']) & (df_ticket['stock_id'] == row['stock_id'])
-    df = df_ticket[mask]
 
-    if len(df) < 3:
-        return pd.Series([0, 0], index=['开盘6秒增益', '开盘6秒方向'])
-
-    vol0 = df.iloc[0]['vol']
-    vol1 = df.iloc[1]['vol']
-    vol2 = df.iloc[2]['vol']
-    buyorsell1 = df.iloc[1]['buyorsell']
-    buyorsell2 = df.iloc[2]['buyorsell']
-
-    factor_a = 1 if vol0 == 0 else (vol1 + vol2) / vol0
-    factor_b = ((vol1 * (1 if buyorsell1 == 0 else -1)) + (vol2 * (1 if buyorsell2 == 0 else -1))) / (vol1 + vol2)
-
-    return pd.Series([factor_a, factor_b], index=['开盘6秒增益', '开盘6秒方向'])
-
+# 你的calculate_factors函数，稍微修改以去除全局变量n的打印和增加
 def calculate_factors(row, df_ticket):
-    global n
-    print(n)
-    n = n + 1
-    # 将日期转换为与df_B中的date格式相同的格式
-    formatted_date     = int(row['日期'].replace('年', '').replace('月', '').replace('日', ''))
-    # 筛选df_B中与当前行日期和股票代码匹配的行
+    formatted_date = int(row['日期'].replace('年', '').replace('月', '').replace('日', ''))
     mask = (df_ticket['date'] == formatted_date) & (df_ticket['stock_id'] == row['股票代码'][:-3])
-    df = df_ticket[mask]
-    df= df.reset_index()
+    df = df_ticket[mask].reset_index(drop=True)
 
-    if len(df) < 3:
-        factor_a = 0
-        factor_b = 0
-    else:
-        # 计算因子a
-        if df.loc[0, 'vol'] == 0:
-            factor_a = 1
-        else:
-            factor_a = (df.loc[1, 'vol'] + df.loc[2, 'vol']) / df.loc[0, 'vol']
-        # 计算因子b
-        factor_b = ((df.loc[1, 'vol'] * (1 if df.loc[1, 'buyorsell'] == 0 else -1)) + (df.loc[2, 'vol'] * (1 if df.loc[2, 'buyorsell'] == 0 else -1))) / (df.loc[1, 'vol'] + df.loc[2, 'vol'])
-    return pd.Series([factor_a, factor_b], index=['factor_a', 'factor_b'])
+    factor_a, factor_b = 0, 0
+    if len(df) >= 3:
+        vol0 = df.loc[0, 'vol']
+        factor_a = 1 if vol0 == 0 else (df.loc[1, 'vol'] + df.loc[2, 'vol']) / vol0
+        factor_b = ((df.loc[1, 'vol'] * (1 if df.loc[1, 'buyorsell'] == 0 else -1)) + 
+                    (df.loc[2, 'vol'] * (1 if df.loc[2, 'buyorsell'] == 0 else -1))) / (df.loc[1, 'vol'] + df.loc[2, 'vol'])
+
+    return factor_a, factor_b
+
+# 用于并行处理DataFrame的函数
+def parallelize_dataframe(df, func, df_ticket):
+    n_cores = 1
+    #n_cores = cpu_count()
+    df_split = np.array_split(df, n_cores)
+    pool = Pool(n_cores)
+    # 使用starmap来并行执行，并收集结果
+    result = pool.starmap(func, [(d, df_ticket, i, len(df_split)) for i, d in enumerate(df_split)])
+    pool.close()
+    pool.join()
+    return pd.concat(result)
+
+# 辅助函数，它适应了calculate_factors函数的调用签名，并打印进度
+def apply_calculate_factors(df, df_ticket, index, total_splits):
+    # 这里添加了一个简单的打印语句来显示进度
+    progress = ((index + 1) / total_splits) * 100
+    print(f"Processing part {index + 1}/{total_splits} - {progress:.2f}% complete")
+    return df.apply(lambda row: calculate_factors(row, df_ticket), axis=1)
 
 def data_to_df(data):
     # 提取列表和日期
@@ -186,8 +171,6 @@ if __name__ == '__main__':
     # 第二步 获取所有ticket数据
     ticket_path = './parquet_ticket'
     df_ticket = get_ticket_and_check(df_raw=df_raw, ticket_path=ticket_path)
-    
-    df_raw = df_raw.head(10)
     
     # 多格式数据保存
     now = datetime.now()

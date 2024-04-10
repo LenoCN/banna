@@ -1,11 +1,11 @@
 import sys
 from datetime import datetime, timedelta
 import pandas as pd
-import swifter
 import pyarrow.parquet as pp
 import pyarrow as pa
 import glob
-from ticket_signal import get_ticket_and_check, calculate_factors, calculate_factors_optimized
+import time
+from ticket_signal import get_ticket_and_check, apply_calculate_factors, parallelize_dataframe
 from find_leading import format_if_decimal
 from get_usdcnh import get_usdcnh_macd
 import numpy as np
@@ -102,12 +102,19 @@ if __name__ == '__main__':
     ticket_path = './parquet_ticket'
     df_ticket = get_ticket_and_check(df_raw=df, ticket_path=ticket_path)
     # 生成ticket信号并反标回原始行情
-    df['formatted_date'] = df['日期'].str.replace('年', '').str.replace('月', '').str.replace('日', '').astype(int)
-    df['stock_id'] = df['股票代码'].str.slice(0, -3)
-    # 使用 swifter 库并行应用函数
-    print('ENtry')
-    df[['开盘6秒增益', '开盘6秒方向']] = df.swifter.apply(lambda row: calculate_factors_optimized(row, df_ticket), axis=1)
-    #df[['开盘6秒增益', '开盘6秒方向']] = df.apply(lambda row: calculate_factors(row, df_ticket), axis=1)
+    print(len(df))
+    df = df.head(100)
+    a = time.time()
+    
+    # 现在我们可以并行化DataFrame的处理，并观察进度
+    df_result_tuples = parallelize_dataframe(df, apply_calculate_factors, df_ticket)
+    # 由于我们得到的是元组列表，我们需要将它们转换为DataFrame
+    df[['开盘6秒增益', '开盘6秒方向']] = pd.DataFrame(df_result_tuples.tolist(), index=df.index)
+   
+   
+   # df[['开盘6秒增益', '开盘6秒方向']] = df.apply(lambda row: calculate_factors(row, df_ticket), axis=1)
+    b = time.time()
+    print(b-a)
     
     # 保存完整数据集
     now = datetime.now()
@@ -117,7 +124,7 @@ if __name__ == '__main__':
     except:
         pass
     try:
-        df.to_csv('data_with_ticket'+time_str,sep='\t')
+        df.to_csv('data_with_ticket_'+time_str,sep='\t')
     except:
         pass
     pp.write_table(pa.Table.from_pandas(df), 'data_with_ticket.parquet')
