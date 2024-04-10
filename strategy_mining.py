@@ -5,13 +5,15 @@ from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 import pyarrow.parquet as pp
 import pyarrow as pa
+import sys
 
 # 读取数据
 file = './data_with_ticket.parquet'
 df = pd.read_parquet(file)
+df.drop(columns=['stock_id', 'date'], inplace=True)
 
 # 需处理的列
-columns_to_exclude = ['日期', '股票简称', '收益', '昨日涨停情况', '总市值']
+columns_to_exclude = ['日期', '股票简称', '收益', '昨日涨停情况', '总市值', 'stock_id', 'date']
 columns_to_filter = df.columns.difference(columns_to_exclude)
 
 # 所有表格转化为float类型
@@ -54,5 +56,5 @@ results_df = pd.DataFrame(flattened_results)
 
 # 保存结果
 time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-pp.write_table(pa.Table.from_pandas(results_df), f'./parquet_data_ana/data_ana_{time_str}.parquet')
-results_df.to_csv(f'data_ana_{time_str}.csv', encoding='GBK', index=False)
+pp.write_table(pa.Table.from_pandas(results_df), f'./parquet_strategy_mining/strategy_mining_{time_str}.parquet')
+results_df.to_csv(f'strategy_mining_{time_str}.csv', encoding='GBK', index=False)
