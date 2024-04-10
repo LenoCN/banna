@@ -88,22 +88,21 @@ if __name__ == '__main__':
     now = datetime.now()
     time_str = now.strftime("%Y%m%d_%H%M%S")
     try:
-        df.to_csv('data_clean_'+time_str+'.csv', encoding='GBK', index=False)
+        df.to_csv('data_clean.csv', encoding='GBK', index=False)
     except:
         pass
     try:
-        df.to_csv('data_clean_'+time_str,sep='\t')
+        df.to_csv('data_clean',sep='\t')
     except:
         pass
     pp.write_table(pa.Table.from_pandas(df), 'data_clean.parquet')
-    pp.write_table(pa.Table.from_pandas(df), './parquet_data_clean/data_clean_'+time_str+'.parquet')
      
     # 获取ticket数据
     ticket_path = './parquet_ticket'
     df_ticket = get_ticket_and_check(df_raw=df, ticket_path=ticket_path)
     # 生成ticket信号并反标回原始行情
     print(len(df))
-    df = df.head(100)
+    df = df.head(1000)
     a = time.time()
     
     # 现在我们可以并行化DataFrame的处理，并观察进度
