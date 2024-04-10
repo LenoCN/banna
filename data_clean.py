@@ -102,7 +102,6 @@ if __name__ == '__main__':
     df_ticket = get_ticket_and_check(df_raw=df, ticket_path=ticket_path)
     # 生成ticket信号并反标回原始行情
     print(len(df))
-    df = df.head(1000)
     a = time.time()
     
     # 现在我们可以并行化DataFrame的处理，并观察进度

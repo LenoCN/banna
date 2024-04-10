@@ -9,6 +9,8 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 from multiprocessing import Pool, cpu_count
+from tqdm import tqdm
+tqdm.pandas()
 
 
 # 你的calculate_factors函数，稍微修改以去除全局变量n的打印和增加
@@ -16,20 +18,28 @@ def calculate_factors(row, df_ticket):
     formatted_date = int(row['日期'].replace('年', '').replace('月', '').replace('日', ''))
     mask = (df_ticket['date'] == formatted_date) & (df_ticket['stock_id'] == row['股票代码'][:-3])
     df = df_ticket[mask].reset_index(drop=True)
-
     factor_a, factor_b = 0, 0
     if len(df) >= 3:
+        # 预先计算总量
+        total_vol = df.loc[1, 'vol'] + df.loc[2, 'vol']
+        # 计算factor_a，确保分母不为零
         vol0 = df.loc[0, 'vol']
-        factor_a = 1 if vol0 == 0 else (df.loc[1, 'vol'] + df.loc[2, 'vol']) / vol0
-        factor_b = ((df.loc[1, 'vol'] * (1 if df.loc[1, 'buyorsell'] == 0 else -1)) + 
-                    (df.loc[2, 'vol'] * (1 if df.loc[2, 'buyorsell'] == 0 else -1))) / (df.loc[1, 'vol'] + df.loc[2, 'vol'])
-
+        factor_a = (total_vol / vol0) if vol0 else 1
+        # 计算factor_b，确保分母不为零
+        if total_vol != 0:
+            factor_b = (
+                (df.loc[1, 'vol'] * np.where(df.loc[1, 'buyorsell'] == 0, 1, -1)) + 
+                (df.loc[2, 'vol'] * np.where(df.loc[2, 'buyorsell'] == 0, 1, -1))
+            ) / total_vol
+        else:
+            factor_b = 0 # 如果分母为0，赋值为0
     return factor_a, factor_b
 
 # 用于并行处理DataFrame的函数
 def parallelize_dataframe(df, func, df_ticket):
-    n_cores = 1
-    #n_cores = cpu_count()
+    #n_cores = 4
+    n_cores = cpu_count()
+    print(f'CPU count : {n_cores}')
     df_split = np.array_split(df, n_cores)
     pool = Pool(n_cores)
     # 使用starmap来并行执行，并收集结果
@@ -40,10 +50,14 @@ def parallelize_dataframe(df, func, df_ticket):
 
 # 辅助函数，它适应了calculate_factors函数的调用签名，并打印进度
 def apply_calculate_factors(df, df_ticket, index, total_splits):
-    # 这里添加了一个简单的打印语句来显示进度
     progress = ((index + 1) / total_splits) * 100
+    print(f"Processing part {index + 1}/{total_splits} - {progress:.2f}% start")
+    if index == 127:
+        res = df.progress_apply(lambda row: calculate_factors(row, df_ticket), axis=1)
+    else:
+        res = df.apply(lambda row: calculate_factors(row, df_ticket), axis=1)
     print(f"Processing part {index + 1}/{total_splits} - {progress:.2f}% complete")
-    return df.apply(lambda row: calculate_factors(row, df_ticket), axis=1)
+    return res 
 
 def data_to_df(data):
     # 提取列表和日期
