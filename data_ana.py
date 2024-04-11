@@ -10,11 +10,12 @@ from datetime import datetime
 start_time = time.time()
 
 # 读取数据
-file = './data_clean.parquet'
+file = './data_with_ticket.parquet'
 df = pd.read_parquet(file)
+df = df.drop(['stock_id', 'date'], axis=1)
 
 # 需处理的列
-columns_to_exclude = ['日期', '股票简称', '收益', '昨日涨停情况', '总市值']
+columns_to_exclude = ['日期', '股票简称', '股票代码', '收益', '昨日涨停情况', '总市值']
 columns_to_filter = [col for col in df.columns if col not in columns_to_exclude]
 
 # 所有表格转化为float类型
@@ -66,6 +67,10 @@ for combo in combinations:
             # 计算筛选后的收益平均值、数量和累乘结果
             avg_return = filtered_df['收益'].mean()
             count = filtered_df['收益'].count()
+            # 计算同一日期收益的均值
+            daily_mean_return = filtered_df.groupby('日期')['收益'].mean()
+            # 计算不同日期的收益均值累乘
+            cumulative_return = daily_mean_return.prod()
             #print(combo, zhangting_condition, filter_type, avg_return , count)
 
             # 将结果添加到临时结果列表中
@@ -74,6 +79,7 @@ for combo in combinations:
                 'Filter_Type': filter_type,
                 'ZhangTing_Condition': zhangting_condition,
                 'Average_Return': avg_return,
+                'cumulative': cumulative_return,
                 'Count': count
             })
 
